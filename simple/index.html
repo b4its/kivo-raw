@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="dashboard-container">
+        <header class="header">
+            <h1 class="logo">AI Agent</h1>
+            <div class="agent-status">
+                <span class="status-indicator online"></span>
+                <span class="status-text">Online</span>
+            </div>
+            <button id="newChatButton" style="margin-left: auto; padding: 8px 15px; border-radius: 4px; background-color: #6c757d; color: white; border: none; cursor: pointer;">Chat Baru</button>
+        </header>
+
+        <main class="chat-interface">
+            <section class="chat-history" id="chatHistory">
+            </section>
+
+            <form class="input-form" id="inputForm">
+                <input type="text" id="userInput" placeholder="Ketik pesan Anda di sini..." required>
+                <button type="submit" id="sendButton">Kirim</button>
+            </form>
+        </main>
+    </div>
+
+    <script>
+        const chatHistory = document.getElementById('chatHistory');
+        const inputForm = document.getElementById('inputForm');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const newChatButton = document.getElementById('newChatButton');
+
+        // --- KONFIGURASI BACKEND EXPRESS.JS ---
+        // Ganti URL ini sesuai dengan konfigurasi server Anda
+        const API_ENDPOINT = 'http://localhost:3000/api/chat'; 
+        
+        // Variabel untuk menyimpan ID sesi chat saat ini
+        let currentChatId = null;
+
+        /**
+         * Fungsi untuk membuat dan menambahkan elemen pesan ke chat history.
+         */
+        function addMessage(content, sender, timeString = null) {
+            if (!timeString) {
+                const now = new Date();
+                timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', `${sender}-message`);
+            
+            // NOTE: Jangan langsung replace/\n/g di sini jika content adalah bagian dari streaming
+            // Karena ini adalah fungsi pembantu, kita hanya mengatur struktur dasarnya
+            messageDiv.innerHTML = `
+                <p>${content}</p>
+                <span class="timestamp">${timeString}</span>
+            `;
+
+            chatHistory.appendChild(messageDiv);
+            
+            // Scroll otomatis ke pesan terbaru
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            return messageDiv;
+        }
+
+        /**
+         * Fungsi yang mengimplementasikan streaming respons dari Express.js (SSE).
+         */
+        async function getAgentResponse(userMessage) {
+            
+            // 1. Tambahkan pesan pengguna ke chat
+            addMessage(userMessage, 'user');
+            
+            let loadingMessage = null;
+            let agentMessageElement = null;
+            
+            try {
+                // Tampilkan pesan loading/typing
+                loadingMessage = addMessage('Agent sedang berpikir...', 'agent');
+                loadingMessage.classList.add('loading');
+                loadingMessage.querySelector('p').style.fontStyle = 'italic';
+                
+                // Menonaktifkan input saat menunggu respons
+                userInput.disabled = true;
+                sendButton.disabled = true;
+
+                // 2. Lakukan Panggilan Fetch Streaming ke Express.js
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // Jika Anda menggunakan JWT atau token, tambahkan di sini:
+                        // 'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify({
+                        message: userMessage,
+                        chatId: currentChatId
+                    })
+                });
+
+                if (!response.ok) {
+                    // Jika respons bukan streaming (misal, 400 atau 500 error JSON dari Express.js)
+                    const errorText = await response.text();
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
+                    } catch {
+                        throw new Error(`HTTP error! Status: ${response.status}. Respons server: ${errorText.substring(0, 100)}...`);
+                    }
+                }
+                
+                // Hapus pesan loading sebelum memulai streaming
+                if (loadingMessage && loadingMessage.parentNode) {
+                    chatHistory.removeChild(loadingMessage);
+                    loadingMessage = null;
+                }
+
+                // 3. Buat elemen pesan AI placeholder
+                agentMessageElement = addMessage('', 'agent');
+                const messageParagraph = agentMessageElement.querySelector('p');
+
+                // 4. Proses Stream (TextDecoder & Reader) dari Express.js (SSE)
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let agentFullResponse = '';
+                let buffer = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    // Proses Buffer baris per baris (Penting untuk SSE: data: {...}\n\n)
+                    const parts = buffer.split('\n\n');
+                    buffer = parts.pop(); // Menyimpan data yang tidak lengkap di buffer
+
+                    for (const part of parts) {
+                        if (part.startsWith('data: ')) {
+                            const dataString = part.substring(6);
+                            try {
+                                const data = JSON.parse(dataString);
+                                
+                                // Cek untuk chunk teks dan error dari backend Anda
+                                if (data.chunk) {
+                                    // Tambahkan chunk ke pesan yang ditampilkan
+                                    agentFullResponse += data.chunk;
+                                    // Menggunakan innerHTML agar format markdown seperti **bold** atau \n menjadi <br>
+                                    messageParagraph.innerHTML = agentFullResponse.replace(/\n/g, '<br>'); 
+                                    
+                                    // Set chatId dari respons pertama (jika ini chat baru)
+                                    if (!currentChatId && data.chatId) {
+                                        currentChatId = data.chatId;
+                                    }
+                                    
+                                    // Scroll otomatis ke bawah
+                                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                                } else if (data.error) {
+                                    // Error yang dikirim dari server melalui stream
+                                    throw new Error(data.error);
+                                }
+                            } catch (e) {
+                                console.error('Gagal parse JSON stream:', dataString, e);
+                            }
+                        }
+                    }
+                }
+                
+                // Final check setelah stream selesai untuk memastikan tidak ada pesan error
+                if (agentFullResponse.length === 0) {
+                     // *** BARIS INI (173) TIDAK AKAN TERJADI LAGI JIKA PERBAIKAN BACKEND DILAKUKAN ***
+                     throw new Error("Respons AI kosong atau stream terputus."); 
+                }
+
+            } catch (error) {
+                console.error('Fetch Streaming Error:', error);
+                
+                // Hapus pesan loading jika masih ada
+                if (loadingMessage && loadingMessage.parentNode) {
+                    loadingMessage.parentNode.removeChild(loadingMessage);
+                }
+                
+                // Hapus elemen pesan AI yang mungkin setengah terisi
+                if (agentMessageElement && agentMessageElement.parentNode) {
+                    agentMessageElement.parentNode.removeChild(agentMessageElement);
+                }
+
+                const errorMessage = `🚨 Terjadi Kesalahan: ${error.message}`;
+                addMessage(errorMessage, 'agent');
+                
+            } finally {
+                // Aktifkan kembali input
+                userInput.disabled = false;
+                sendButton.disabled = false;
+                userInput.focus();
+            }
+        }
+
+
+        // Event Listener untuk pengiriman formulir
+        inputForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const message = userInput.value.trim();
+            
+            if (message && !userInput.disabled) {
+                userInput.value = ''; // Kosongkan input
+                getAgentResponse(message); // Kirim pesan dan proses streaming
+            }
+        });
+
+        // Event listener untuk tombol chat baru
+        newChatButton.addEventListener('click', () => {
+            currentChatId = null; // Reset ID chat
+            chatHistory.innerHTML = ''; // Hapus riwayat di tampilan
+            addMessage('Mulai sesi chat baru! Apa ide bisnis Anda?', 'agent');
+            userInput.focus();
+        });
+
+        // Tampilkan pesan selamat datang saat dokumen dimuat
+        document.addEventListener('DOMContentLoaded', () => {
+            addMessage('Halo! Saya adalah Konsultan BMC Anda. Mari kita mulai bedah ide bisnis Anda!', 'agent');
+        });
+
+    </script>
+</body>
+
+
+</html>

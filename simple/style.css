@@ -1,0 +1,241 @@
+/* 1. CSS Reset dan Global Styles (Best Practice) */
+:root {
+    /* Base Variables untuk Light Mode (Default) */
+    --color-primary: #007bff; /* Biru cerah untuk tombol */
+    --color-text: #1a1a1a;   /* Teks gelap */
+    --color-background: #ffffff; /* Latar belakang terang */
+    --color-card-bg: #f4f4f9; /* Latar belakang komponen/kartu */
+    --color-border: #e0e0e0;
+    --color-shadow: rgba(0, 0, 0, 0.1);
+
+    /* Specific Chat Variables */
+    --color-agent-bubble: #e1e9f1;
+    --color-user-bubble: #007bff;
+    --color-user-text: #ffffff;
+
+    /* Typography */
+    --font-family-primary: 'Inter', sans-serif;
+    --font-size-base: 16px;
+}
+
+/* 2. Media Query untuk Dark Mode (System Preference) */
+@media (prefers-color-scheme: dark) {
+    :root {
+        /* Overriding Variables untuk Dark Mode */
+        --color-text: #f0f0f0; /* Teks terang */
+        --color-background: #121212; /* Latar belakang sangat gelap */
+        --color-card-bg: #1e1e1e; /* Latar belakang komponen/kartu lebih gelap */
+        --color-border: #333333;
+        --color-shadow: rgba(255, 255, 255, 0.1);
+
+        /* Specific Chat Variables */
+        --color-agent-bubble: #333333;
+        --color-user-bubble: #5a8dff; /* Warna user bubble di dark mode */
+        --color-user-text: #ffffff;
+    }
+}
+
+/* Reset Dasar */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-family-primary);
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+    background-color: var(--color-background);
+    transition: background-color 0.3s, color 0.3s; /* Transisi halus */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+/* 3. Dashboard Container (Layout Utama) */
+.dashboard-container {
+    width: 100%;
+    max-width: 800px; /* Ukuran yang ideal untuk chat interface */
+    height: 90vh; /* Mengambil sebagian besar tinggi viewport */
+    border-radius: 12px;
+    background-color: var(--color-card-bg);
+    box-shadow: 0 10px 30px var(--color-shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Penting untuk menjaga layout */
+}
+
+/* 4. Header Styling */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--color-border);
+    background-color: var(--color-card-bg); /* Memastikan header tetap konsisten */
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.agent-status {
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-indicator.online {
+    background-color: #28a745; /* Hijau */
+}
+
+/* 5. Chat Interface dan History */
+.chat-interface {
+    flex-grow: 1; /* Memastikan mengambil sisa ruang vertikal */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.chat-history {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto; /* Scrollable chat history */
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Jarak antar pesan */
+}
+
+/* Scrollbar Styling (Best Practice: custom scrollbar) */
+.chat-history::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-history::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: 10px;
+}
+
+/* 6. Message Styling */
+.message {
+    max-width: 80%;
+    padding: 10px 15px;
+    border-radius: 18px;
+    position: relative;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.agent-message {
+    align-self: flex-start;
+    background-color: var(--color-agent-bubble);
+    color: var(--color-text);
+    border-bottom-left-radius: 3px; /* "Tail" effect */
+}
+
+.user-message {
+    align-self: flex-end;
+    background-color: var(--color-user-bubble);
+    color: var(--color-user-text);
+    border-bottom-right-radius: 3px; /* "Tail" effect */
+}
+
+.timestamp {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.75rem;
+    opacity: 0.6;
+    text-align: right;
+    color: inherit; /* Mengambil warna dari bubble parent */
+}
+
+/* 7. Input Form Styling */
+.input-form {
+    display: flex;
+    padding: 15px 20px;
+    border-top: 1px solid var(--color-border);
+    background-color: var(--color-card-bg);
+}
+
+.input-form input[type="text"] {
+    flex-grow: 1;
+    padding: 12px 15px;
+    border: 1px solid var(--color-border);
+    border-radius: 25px;
+    font-size: 1rem;
+    margin-right: 10px;
+    background-color: var(--color-background);
+    color: var(--color-text);
+    transition: border-color 0.3s, background-color 0.3s;
+}
+
+.input-form input[type="text"]:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+.input-form button {
+    padding: 12px 20px;
+    background-color: var(--color-primary);
+    color: var(--color-user-text); /* Putih */
+    border: none;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.input-form button:hover {
+    background-color: #0056b3; /* Warna primary sedikit lebih gelap */
+}
+
+.input-form button:active {
+    transform: scale(0.98);
+}
+
+/* 8. Responsiveness (Mobile First) */
+@media (max-width: 600px) {
+    body {
+        padding: 0;
+        min-height: 100vh;
+        align-items: stretch;
+    }
+
+    .dashboard-container {
+        height: 100vh;
+        border-radius: 0;
+        box-shadow: none;
+        max-width: none;
+    }
+
+    .header, .input-form {
+        padding: 15px;
+    }
+
+    .logo {
+        font-size: 1.3rem;
+    }
+
+    .chat-history {
+        padding: 15px;
+    }
+
+    .message {
+        max-width: 90%;
+        padding: 8px 12px;
+    }
+}
