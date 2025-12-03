@@ -1,4 +1,3 @@
-// backendPress/src/models/user.js
 
 const mongoose = require('mongoose');
 
@@ -66,8 +65,7 @@ const messageSchema = new mongoose.Schema({
     },
     role: { 
         type: String, 
-        enum: ['user', 'assistant'], 
-        required: true 
+        enum: ['user', 'assistant', 'system', 'tool'] // Tambahkan 'tool'
     },
     createdAt: { 
         type: Date, 

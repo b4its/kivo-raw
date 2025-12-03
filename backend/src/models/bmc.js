@@ -1,4 +1,4 @@
-// src/models/bmc.js
+
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
@@ -25,7 +25,7 @@ const itemContentSchema = new mongoose.Schema({
         required: true
     },
     content: {
-        type: String, // **✅ PERBAIKAN: Diubah dari 'Object' menjadi 'String'**
+        type: String,
         required: true
     }
 }, { _id: false });
@@ -40,7 +40,6 @@ const bmcPostSchema = new mongoose.Schema({
     },
     coordinat: {
         type: coordinateSchema,
-        // Dibuat tidak required di sini, tapi di tool function kita akan set default.
     },
     authorId: { // Mereferensi User Model
         type: mongoose.Schema.Types.ObjectId,

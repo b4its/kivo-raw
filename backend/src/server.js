@@ -1,11 +1,9 @@
-// File: src/server.js (Perbaikan)
-
 const express = require('express');
 const mongoose = require('mongoose');
-const connectDB = require('./config/database'); // Asumsi Anda punya file ini
+const connectDB = require('./config/database');
 const UserModel = require('./models/user');
 const aiController = require('./controllers/aiControllers');
-const userController = require('./controllers/userController'); // <<< DITAMBAHKAN
+const userController = require('./controllers/userController'); 
 const cors = require('cors');
 
 const OpenAI = require('openai/index.js');
@@ -31,7 +29,7 @@ const port = 3000;
 app.use(express.json());
 
 // 4. Jalankan koneksi database
-connectDB(); // <<< DIHILANGKAN KOMENTAR
+connectDB();
 
 app.use(cors({
     origin: ['http://127.0.0.1:3000', 'null'],

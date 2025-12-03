@@ -1,8 +1,4 @@
-// backendPress/src/controllers/bmcController.js
-
 const BmcPostModel = require('../models/bmc'); 
-// Pastikan Anda telah mengimpor model BMC yang benar dari lokasi yang sesuai
-
 /**
  * Mengambil semua data BMC dari database yang bersifat publik (isPublic: true).
  * @returns {Promise<Array>} Array berisi dokumen BMC.
@@ -35,10 +31,8 @@ exports.getBmcPostById = async (req, res) => {
         const bmcId = req.params.id;
 
         // Cari data BMC berdasarkan _id
-        // Gunakan .populate('authorId') jika Anda ingin menyertakan detail penulis dari UserModel
         const bmcPost = await BmcPostModel
             .findById(bmcId)
-            // .populate('authorId', 'username email'); // Contoh populate untuk menampilkan data user
 
         // Jika data tidak ditemukan
         if (!bmcPost) {
@@ -47,19 +41,6 @@ exports.getBmcPostById = async (req, res) => {
                 message: 'Data BMC tidak ditemukan.'
             });
         }
-
-        // --- Logic Visibility (Opsional, tapi disarankan) ---
-        // Jika isPublic false, cek apakah pengguna yang meminta adalah Author
-        // Asumsi: req.user.id tersedia melalui middleware Auth
-        if (bmcPost.isPublic === false) {
-            // Anda perlu logic otentikasi di sini, contoh:
-            // if (!req.user || bmcPost.authorId.toString() !== req.user.id) {
-            //     return res.status(403).json({ success: false, message: 'Akses ditolak.' });
-            // }
-            // Karena tidak ada middleware Auth, kita anggap semua request ke endpoint ini harus public
-            // atau tambahkan check di router jika endpoint ini private.
-        }
-        // ----------------------------------------------------
 
         // Respon sukses
         res.status(200).json({
@@ -94,7 +75,6 @@ exports.getAllPublicBmcPosts = async (req, res) => {
         const publicBmcPosts = await BmcPostModel
             .find({ isPublic: true })
             .sort({ createdAt: -1 }) // Urutkan berdasarkan yang terbaru
-            // .populate('authorId', 'username'); // Opsi: Tampilkan username penulis
 
         // Jika tidak ada postingan public
         if (!publicBmcPosts || publicBmcPosts.length === 0) {
@@ -121,7 +101,97 @@ exports.getAllPublicBmcPosts = async (req, res) => {
     }
 };
 
+const logCurrentBmcProgress = async (userId) => {
+    try {
+        // Cari BMC terakhir yang dimiliki oleh user
+        const latestBmc = await BmcPostModel
+            .findOne({ authorId: userId })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        if (latestBmc) {
+            console.log("==========================================");
+            console.log("📝 DATA BMC SEMENTARA DARI DATABASE (BMC ID: " + latestBmc._id.toString() + ")");
+            const progress = latestBmc.items.map(item => ({
+                tag: item.tag,
+                status: item.content && item.content.trim().length > 0 ? "✅ LENGKAP" : "❌ KOSONG"
+            }));
+
+            // Jika ada 9 item lengkap, kita tahu BMC sudah disimpan.
+            if (latestBmc.items.length === 9) {
+                 console.log("STATUS: LENGKAP - BMC Telah Disimpan Sebelumnya.");
+            } else {
+                 console.log(`STATUS: IN PROGRESS - Item Ditemukan: ${latestBmc.items.length}/9`);
+            }
+            
+            console.table(progress);
+            console.log("==========================================");
+            return latestBmc._id.toString(); // Mengembalikan BMC ID jika ada
+        } else {
+            console.log("==========================================");
+            console.log("📝 DATA BMC SEMENTARA: BELUM ADA BMC YANG DISIMPAN.");
+            console.log("==========================================");
+            return null;
+        }
+
+    } catch (error) {
+        console.error("❌ Error saat log BMC progress:", error.message);
+        return null;
+    }
+}
+
+/**
+ * @desc    Mengupdate satu data BMC berdasarkan ID (_id) dan array items
+ * @route   PUT /api/bmc/:id
+ * @access  Private (Hanya Author yang dapat mengupdate) - Implementasi di sini diasumsikan ada req.userId
+ */
+exports.updateBmcPostById = async (req, res) => {
+    const { items } = req.body;
+    const bmcId = req.params.id;
+    // Asumsi: req.userId tersedia dari middleware Auth
+    const userId = req.userId; 
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ success: false, message: 'Data items BMC tidak boleh kosong.' });
+    }
+
+    try {
+        const updatedBmcPost = await BmcPostModel.findOneAndUpdate(
+            { _id: bmcId, authorId: userId }, // Cari berdasarkan ID dan Author ID
+            { $set: { items: items, updatedAt: new Date() } },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedBmcPost) {
+            return res.status(404).json({
+                success: false,
+                message: 'Data BMC tidak ditemukan atau Anda tidak memiliki izin untuk mengupdate.'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Data BMC berhasil diupdate.',
+            data: updatedBmcPost
+        });
+
+    } catch (error) {
+        console.error('Error saat mengupdate BMC berdasarkan ID:', error);
+        if (error.kind === 'ObjectId') {
+            return res.status(400).json({ success: false, message: 'Format ID BMC tidak valid.' });
+        }
+        res.status(500).json({
+            success: false,
+            message: 'Gagal mengupdate data BMC. Terjadi kesalahan server internal.'
+        });
+    }
+};
+
 
 module.exports = { 
-    getBMCposted 
+    getBMCposted,
+    getBmcPostById,
+    getAllPublicBmcPosts,
+    updateBmcPostById,
+    logCurrentBmcProgress
 };
