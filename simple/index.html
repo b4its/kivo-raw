@@ -38,11 +38,38 @@
         const newChatButton = document.getElementById('newChatButton');
 
         // --- KONFIGURASI BACKEND EXPRESS.JS ---
-        // Ganti URL ini sesuai dengan konfigurasi server Anda
         const API_ENDPOINT = 'http://localhost:3000/api/chat'; 
-        
-        // Variabel untuk menyimpan ID sesi chat saat ini
         let currentChatId = null;
+
+
+        // =======================================================
+        // *** FUNGSI PERBAIKAN: KONVERSI MARKDOWN SEDERHANA ***
+        // =======================================================
+        /**
+         * Mengkonversi string Markdown dasar ke HTML. 
+         * Idealnya, gunakan library full-featured, tapi ini cukup untuk bold, italic, dan newline.
+         * @param {string} markdownText Teks dengan format Markdown.
+         * @returns {string} Teks yang sudah diformat HTML.
+         */
+        function markdownToHtml(markdownText) {
+            // 1. Mengganti Newline (\n) menjadi <br> untuk baris baru
+            let html = markdownText.replace(/\n/g, '<br>');
+
+            // 2. Mengganti **bold** menjadi <strong>
+            // Menggunakan regex ganda untuk mencocokkan teks di antara **...** atau __...__
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+            // 3. Mengganti *italic* atau _italic_ menjadi <em>
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+
+            // Catatan: Untuk list (* atau -), heading (#), dan code blocks (```) 
+            // diperlukan parser Markdown yang lebih canggih (seperti marked.js atau showdown.js).
+
+            return html;
+        }
+
 
         /**
          * Fungsi untuk membuat dan menambahkan elemen pesan ke chat history.
@@ -56,10 +83,12 @@
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('message', `${sender}-message`);
             
-            // NOTE: Jangan langsung replace/\n/g di sini jika content adalah bagian dari streaming
-            // Karena ini adalah fungsi pembantu, kita hanya mengatur struktur dasarnya
+            // NOTE: Gunakan markdownToHtml di sini saat menampilkan pesan error/pesan statis 
+            // Jika sender adalah 'agent'
+            let processedContent = sender === 'agent' ? markdownToHtml(content) : content;
+
             messageDiv.innerHTML = `
-                <p>${content}</p>
+                <p>${processedContent}</p>
                 <span class="timestamp">${timeString}</span>
             `;
 
@@ -152,8 +181,9 @@
                                 if (data.chunk) {
                                     // Tambahkan chunk ke pesan yang ditampilkan
                                     agentFullResponse += data.chunk;
-                                    // Menggunakan innerHTML agar format markdown seperti **bold** atau \n menjadi <br>
-                                    messageParagraph.innerHTML = agentFullResponse.replace(/\n/g, '<br>'); 
+                                    
+                                    // *** PERBAIKAN UTAMA: PANGGIL FUNGSI markdownToHtml() ***
+                                    messageParagraph.innerHTML = markdownToHtml(agentFullResponse);
                                     
                                     // Set chatId dari respons pertama (jika ini chat baru)
                                     if (!currentChatId && data.chatId) {
@@ -175,8 +205,7 @@
                 
                 // Final check setelah stream selesai untuk memastikan tidak ada pesan error
                 if (agentFullResponse.length === 0) {
-                     // *** BARIS INI (173) TIDAK AKAN TERJADI LAGI JIKA PERBAIKAN BACKEND DILAKUKAN ***
-                     throw new Error("Respons AI kosong atau stream terputus."); 
+                    throw new Error("Respons AI kosong atau stream terputus."); 
                 }
 
             } catch (error) {
@@ -192,8 +221,9 @@
                     agentMessageElement.parentNode.removeChild(agentMessageElement);
                 }
 
-                const errorMessage = `🚨 Terjadi Kesalahan: ${error.message}`;
-                addMessage(errorMessage, 'agent');
+                // Tambahkan pesan error yang sudah diformat Markdown (**bold**)
+                const errorMessage = `🚨 Terjadi Kesalahan: **${error.message}**`;
+                addMessage(errorMessage, 'agent'); // addMessage kini sudah memproses Markdown
                 
             } finally {
                 // Aktifkan kembali input
@@ -202,7 +232,7 @@
                 userInput.focus();
             }
         }
-
+            
 
         // Event Listener untuk pengiriman formulir
         inputForm.addEventListener('submit', function(e) {
